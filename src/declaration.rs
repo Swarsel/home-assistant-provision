@@ -10,7 +10,14 @@ pub struct Declaration {
 
 #[derive(Deserialize)]
 pub struct Owner {
+    pub name: String,
     pub username: String,
+    #[serde(default = "default_language")]
+    pub language: String,
+}
+
+fn default_language() -> String {
+    "en".to_string()
 }
 
 pub fn load(path: &Path) -> Result<Declaration> {
