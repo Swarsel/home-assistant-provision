@@ -6,5 +6,13 @@ description = "Declarative provisioning of Home Assistant"
 license = "MIT"
 repository = "https://github.com/Swarsel/home-assistant-provision"
 
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+env_logger = "0.11"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
 [profile.release]
 lto = true
