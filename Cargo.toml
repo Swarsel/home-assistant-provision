@@ -1,0 +1,10 @@
+[package]
+name = "home-assistant-provision"
+version = "0.1.0"
+edition = "2024"
+description = "Declarative provisioning of Home Assistant"
+license = "MIT"
+repository = "https://github.com/Swarsel/home-assistant-provision"
+
+[profile.release]
+lto = true

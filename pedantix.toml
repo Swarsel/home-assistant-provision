@@ -1,0 +1,32 @@
+top-level-blank-lines = 1
+
+[args]
+first = ["self", "inputs", "config", "lib", "pkgs", "options"]
+last = ["..."]
+
+[attrs]
+first = [
+  "flake",
+  "imports",
+  "options",
+  "config",
+  "services",
+  "enable",
+  "package",
+]
+flatten = true
+last = ["systemd", "nodes", "meta"]
+merge = true
+name-style = "identifier"
+
+[inherits]
+first = ["self", "inputs", "config", "lib", "pkgs", "options"]
+name-style = "identifier"
+sort = true
+
+[[overrides]]
+path = "inputs"
+
+[overrides.attrs]
+blank-lines = 1
+first = []
