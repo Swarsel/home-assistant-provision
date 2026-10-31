@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde_json::Value;
 use ureq::{Agent, Body, http};
 
@@ -46,6 +46,10 @@ impl Api {
 
     pub fn set_token(&mut self, token: String) {
         self.token = Some(token);
+    }
+
+    pub fn token(&self) -> Result<&str> {
+        self.token.as_deref().context("not authenticated")
     }
 
     pub fn get(&self, path: &str) -> Result<Response> {

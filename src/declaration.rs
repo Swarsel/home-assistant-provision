@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -6,6 +6,8 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct Declaration {
     pub owner: Owner,
+    #[serde(default)]
+    pub areas: BTreeMap<String, Area>,
 }
 
 #[derive(Deserialize)]
@@ -14,6 +16,15 @@ pub struct Owner {
     pub username: String,
     #[serde(default = "default_language")]
     pub language: String,
+}
+
+#[derive(Deserialize)]
+pub struct Area {
+    pub name: String,
+    #[serde(default)]
+    pub aliases: Vec<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
 }
 
 fn default_language() -> String {
