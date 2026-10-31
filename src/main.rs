@@ -1,6 +1,7 @@
 mod api;
 mod areas;
 mod declaration;
+mod entries;
 mod flow;
 mod onboarding;
 mod state;
@@ -44,6 +45,7 @@ fn main() -> Result<()> {
 
     let mut ws = websocket::Ws::connect(&args.url, api.token()?)?;
     areas::reconcile(&mut ws, &declaration, &mut state, &args.state)?;
+    entries::reconcile(&api, &mut ws, &declaration, &mut state, &args.state)?;
     ws.close();
     log::info!("provisioning finished");
     Ok(())

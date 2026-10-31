@@ -2,12 +2,15 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Deserialize)]
 pub struct Declaration {
     pub owner: Owner,
     #[serde(default)]
     pub areas: BTreeMap<String, Area>,
+    #[serde(default)]
+    pub entries: BTreeMap<String, Entry>,
 }
 
 #[derive(Deserialize)]
@@ -25,6 +28,17 @@ pub struct Area {
     pub aliases: Vec<String>,
     #[serde(default)]
     pub icon: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct Entry {
+    pub domain: String,
+    #[serde(default)]
+    pub steps: Vec<Value>,
+    #[serde(default)]
+    pub options: Vec<Value>,
+    #[serde(default)]
+    pub title: Option<String>,
 }
 
 fn default_language() -> String {
