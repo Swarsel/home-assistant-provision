@@ -1,7 +1,7 @@
 use anyhow::{Result, bail};
 use serde_json::Value;
 
-use crate::api::Api;
+use crate::{api::Api, declaration};
 
 pub fn drive(api: &Api, path: &str, start: Value, steps: &[Value], label: &str) -> Result<Value> {
     let mut response = api.post(path, &start)?;
@@ -38,7 +38,8 @@ pub fn drive(api: &Api, path: &str, start: Value, steps: &[Value], label: &str) 
                         fields(&result)
                     );
                 };
-                response = api.post(&format!("{path}/{flow_id}"), input)?;
+                let input = declaration::resolve_files(input)?;
+                response = api.post(&format!("{path}/{flow_id}"), &input)?;
             }
             Some("create_entry") => {
                 if remaining.next().is_some() {
