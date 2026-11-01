@@ -53,7 +53,7 @@ pub fn reconcile(
             .or_else(|| {
                 existing
                     .iter()
-                    .find(|candidate| candidate.name == area.name)
+                    .find(|candidate| same_name(&candidate.name, &area.name))
             });
         let area_id = match current {
             Some(found) => {
@@ -90,6 +90,14 @@ pub fn reconcile(
     Ok(())
 }
 
+fn same_name(left: &str, right: &str) -> bool {
+    normalized(left) == normalized(right)
+}
+
+fn normalized(name: &str) -> String {
+    name.split_whitespace().collect::<String>().to_lowercase()
+}
+
 fn differs(found: &ExistingArea, area: &Area) -> bool {
     found.name != area.name
         || found.icon != area.icon
@@ -108,7 +116,7 @@ fn object(value: Value) -> Map<String, Value> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExistingArea, differs};
+    use super::{ExistingArea, differs, same_name};
     use crate::declaration::Area;
 
     #[test]
@@ -126,5 +134,12 @@ mod tests {
                 icon: None,
             }
         ));
+    }
+
+    #[test]
+    fn names_match_like_home_assistant_compares_them() {
+        assert!(same_name("Living Room", "living room"));
+        assert!(same_name("Living Room", "livingroom"));
+        assert!(!same_name("Kitchen", "Kitchenette"));
     }
 }
