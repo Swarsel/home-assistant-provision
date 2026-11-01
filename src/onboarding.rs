@@ -3,7 +3,7 @@ use serde_json::json;
 
 use crate::{api::Api, declaration::Owner, flow};
 
-pub fn authenticate(api: &mut Api, owner: &Owner, password: &str) -> Result<()> {
+pub fn authenticate(api: &mut Api, owner: &Owner, password: &str) -> Result<bool> {
     let steps = api
         .get("/api/onboarding")?
         .expect_success("onboarding status")?;
@@ -80,5 +80,5 @@ pub fn authenticate(api: &mut Api, owner: &Owner, password: &str) -> Result<()> 
         )?
         .expect_success("integration")?;
     }
-    Ok(())
+    Ok(created_owner)
 }

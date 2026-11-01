@@ -1,4 +1,8 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    thread,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -19,7 +23,9 @@ const ENTRIES: &str = "/api/config/config_entries/entry";
 #[derive(Deserialize)]
 struct ExistingEntry {
     entry_id: String,
+    domain: String,
     title: String,
+    source: String,
 }
 
 pub fn reconcile(
@@ -45,6 +51,9 @@ pub fn reconcile(
                 &format!("options of entry {name}"),
             )?;
         }
+    }
+    if declaration.remove_onboarding_integrations {
+        remove_onboarding_leftovers(api, state)?;
     }
     Ok(())
 }
@@ -79,16 +88,24 @@ fn ensure(
     state_path: &Path,
 ) -> Result<String> {
     let existing = list(api)?;
-    if let Some(known) = state.entries.get(name)
-        && existing
+    if let Some(known) = state.entries.get(name) {
+        if existing
             .iter()
             .any(|candidate| candidate.entry_id == known.entry_id)
-    {
-        if known.steps == entry.steps {
-            return Ok(known.entry_id.clone());
+        {
+            if known.steps == entry.steps {
+                return Ok(known.entry_id.clone());
+            }
+            log::info!("recreating entry {name} because its steps changed");
+            delete(api, &known.entry_id)?;
         }
-        log::info!("recreating entry {name} because its steps changed");
-        delete(api, &known.entry_id)?;
+    } else if let Some(found) = existing
+        .iter()
+        .find(|candidate| candidate.source == "onboarding" && candidate.domain == entry.domain)
+    {
+        log::info!("adopting onboarding entry {} as {name}", found.entry_id);
+        remember(state, state_path, name, entry, found.entry_id.clone())?;
+        return Ok(found.entry_id.clone());
     }
     log::info!("creating entry {name} ({})", entry.domain);
     let created = flow::drive(
@@ -138,6 +155,25 @@ fn set_title(api: &Api, ws: &mut Ws, entry_id: &str, title: &str) -> Result<()> 
     Ok(())
 }
 
+fn remove_onboarding_leftovers(api: &Api, state: &State) -> Result<()> {
+    let managed: Vec<&str> = state
+        .entries
+        .values()
+        .map(|entry| entry.entry_id.as_str())
+        .collect();
+    for entry in list(api)? {
+        if entry.source == "onboarding" && !managed.contains(&entry.entry_id.as_str()) {
+            log::info!(
+                "removing onboarding integration {} ({})",
+                entry.title,
+                entry.domain
+            );
+            delete(api, &entry.entry_id)?;
+        }
+    }
+    Ok(())
+}
+
 fn list(api: &Api) -> Result<Vec<ExistingEntry>> {
     let entries = api.get(ENTRIES)?.expect_success("listing entries")?;
     serde_json::from_value(entries).context("parsing entry list")
@@ -151,4 +187,20 @@ fn delete(api: &Api, entry_id: &str) -> Result<()> {
 
 fn object(value: Value) -> Map<String, Value> {
     value.as_object().cloned().unwrap_or_default()
+}
+
+pub fn wait_for_onboarding_entries(api: &Api) -> Result<()> {
+    let started = Instant::now();
+    let mut previous = usize::MAX;
+    let mut unchanged = 0;
+    while unchanged < 3 && started.elapsed() < Duration::from_secs(30) {
+        thread::sleep(Duration::from_secs(1));
+        let count = list(api)?
+            .iter()
+            .filter(|entry| entry.source == "onboarding")
+            .count();
+        unchanged = if count == previous { unchanged + 1 } else { 0 };
+        previous = count;
+    }
+    Ok(())
 }

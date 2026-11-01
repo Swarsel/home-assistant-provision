@@ -8,6 +8,8 @@ use serde_json::{Map, Value};
 pub struct Declaration {
     pub owner: Owner,
     #[serde(default)]
+    pub remove_onboarding_integrations: bool,
+    #[serde(default)]
     pub areas: BTreeMap<String, Area>,
     #[serde(default)]
     pub entries: BTreeMap<String, Entry>,

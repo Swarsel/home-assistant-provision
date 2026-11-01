@@ -37,11 +37,14 @@ fn main() -> Result<()> {
 
     let mut api = api::Api::new(&args.url);
     api.wait_until_ready(Duration::from_secs(args.wait))?;
-    onboarding::authenticate(
+    let created_owner = onboarding::authenticate(
         &mut api,
         &declaration.owner,
         password.trim_end_matches(['\n', '\r']),
     )?;
+    if created_owner && declaration.remove_onboarding_integrations {
+        entries::wait_for_onboarding_entries(&api)?;
+    }
 
     let mut ws = websocket::Ws::connect(&args.url, api.token()?)?;
     areas::reconcile(&mut ws, &declaration, &mut state, &args.state)?;
