@@ -3,6 +3,7 @@ mod areas;
 mod declaration;
 mod entries;
 mod flow;
+mod form;
 mod onboarding;
 mod state;
 mod websocket;

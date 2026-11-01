@@ -1,7 +1,7 @@
 use anyhow::{Result, bail};
-use serde_json::{Map, Value};
+use serde_json::Value;
 
-use crate::{api::Api, declaration};
+use crate::{api::Api, declaration, form};
 
 pub fn drive(api: &Api, path: &str, start: Value, steps: &[Value], label: &str) -> Result<Value> {
     let mut response = api.post(path, &start)?;
@@ -38,7 +38,16 @@ pub fn drive(api: &Api, path: &str, start: Value, steps: &[Value], label: &str) 
                         fields(&result)
                     );
                 };
-                let input = with_form_defaults(&result, declaration::resolve_files(input)?);
+                let (input, missing) =
+                    form::complete(&result["data_schema"], declaration::resolve_files(input)?);
+                if !missing.is_empty() {
+                    abort(api, path, &flow_id);
+                    bail!(
+                        "{label}: step {} is missing required fields: {}",
+                        step_name(&result),
+                        missing.join(", ")
+                    );
+                }
                 response = api.post(&format!("{path}/{flow_id}"), &input)?;
             }
             Some("create_entry") => {
@@ -54,85 +63,6 @@ pub fn drive(api: &Api, path: &str, start: Value, steps: &[Value], label: &str) 
             }
             None => bail!("{label}: unexpected response: {result}"),
         }
-    }
-}
-
-fn with_form_defaults(result: &Value, input: Value) -> Value {
-    let Value::Object(map) = input else {
-        return input;
-    };
-    Value::Object(fill_defaults(result["data_schema"].as_array(), map))
-}
-
-fn fill_defaults(fields: Option<&Vec<Value>>, mut map: Map<String, Value>) -> Map<String, Value> {
-    for field in fields.into_iter().flatten() {
-        let Some(name) = field["name"].as_str() else {
-            continue;
-        };
-        if field["type"] == "expandable" {
-            let inner = match map.remove(name) {
-                Some(Value::Object(inner)) => inner,
-                _ => Map::new(),
-            };
-            map.insert(
-                name.to_string(),
-                Value::Object(fill_defaults(field["schema"].as_array(), inner)),
-            );
-            continue;
-        }
-        if map.contains_key(name) {
-            continue;
-        }
-        if let Some(value) = prefill(field) {
-            map.insert(name.to_string(), value);
-        }
-    }
-    map
-}
-
-fn prefill(field: &Value) -> Option<Value> {
-    if let Some(value) = field["description"]
-        .get("suggested_value")
-        .filter(|value| !value.is_null())
-    {
-        return Some(value.clone());
-    }
-    if let Some(value) = field.get("default") {
-        return Some(value.clone());
-    }
-    if field["required"] != true {
-        return None;
-    }
-    let selector = &field["selector"];
-    if selector.get("boolean").is_some() {
-        return Some(Value::Bool(false));
-    }
-    if let Some(options) = selector["select"]["options"].as_array() {
-        return options.first().map(|option| {
-            option
-                .get("value")
-                .cloned()
-                .unwrap_or_else(|| option.clone())
-        });
-    }
-    if let Some(number) = selector.get("number") {
-        return Some(number.get("min").cloned().unwrap_or(Value::from(0)));
-    }
-    if selector.get("text").is_some() {
-        return Some(Value::String(String::new()));
-    }
-    match field["type"].as_str() {
-        Some("boolean") => Some(Value::Bool(false)),
-        Some("string") => Some(Value::String(String::new())),
-        Some("integer") | Some("float") => Some(Value::from(0)),
-        Some("select") => field["options"].as_array()?.first().map(|option| {
-            option
-                .as_array()
-                .and_then(|pair| pair.first())
-                .unwrap_or(option)
-                .clone()
-        }),
-        _ => None,
     }
 }
 
@@ -157,53 +87,5 @@ fn fields(result: &Value) -> String {
 fn abort(api: &Api, path: &str, flow_id: &str) {
     if !flow_id.is_empty() {
         let _ = api.delete(&format!("{path}/{flow_id}"));
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::with_form_defaults;
-
-    #[test]
-    fn fills_missing_fields_like_the_frontend_would() {
-        let form = json!({
-            "data_schema": [
-                { "name": "broker", "required": true, "selector": { "text": { "type": "text" } } },
-                { "name": "port", "required": true, "default": 1883, "selector": { "number": { "min": 1.0 } } },
-                { "name": "username", "required": false, "selector": { "text": { "type": "text" } } },
-                { "name": "note", "required": false, "description": { "suggested_value": "hi" } },
-                { "name": "blank", "required": true, "default": "x", "description": { "suggested_value": null } },
-                {
-                    "name": "other_settings",
-                    "type": "expandable",
-                    "required": true,
-                    "schema": [
-                        { "name": "set_client_cert", "required": true, "selector": { "boolean": {} } },
-                        { "name": "set_ca_cert", "required": true, "selector": { "select": { "options": ["off", "auto"] } } },
-                        { "name": "transport", "required": true, "selector": { "select": { "options": [ { "label": "TCP", "value": "tcp" } ] } } },
-                        { "name": "keepalive", "required": true, "selector": { "number": { "min": 15.0 } } },
-                        { "name": "client_id", "required": false, "selector": { "text": { "type": "text" } } },
-                    ]
-                },
-                { "name": "legacy", "required": true, "type": "select", "options": [["a", "A"], ["b", "B"]] },
-            ]
-        });
-        let input = with_form_defaults(
-            &form,
-            json!({ "broker": "x", "other_settings": { "keepalive": 30 } }),
-        );
-        assert_eq!(
-            input,
-            json!({
-                "broker": "x",
-                "port": 1883,
-                "note": "hi",
-                "blank": "x",
-                "other_settings": { "set_client_cert": false, "set_ca_cert": "off", "transport": "tcp", "keepalive": 30 },
-                "legacy": "a",
-            })
-        );
     }
 }
