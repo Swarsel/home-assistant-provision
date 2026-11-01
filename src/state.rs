@@ -16,6 +16,8 @@ pub struct State {
 pub struct EntryState {
     pub entry_id: String,
     pub steps: Vec<Value>,
+    #[serde(default)]
+    pub options: Vec<Value>,
 }
 
 impl State {
@@ -59,6 +61,7 @@ mod tests {
             EntryState {
                 entry_id: "entry456".to_string(),
                 steps: vec![json!({ "broker": "127.0.0.1" })],
+                options: vec![json!({ "discovery": true })],
             },
         );
         state.save(&path).unwrap();
@@ -66,6 +69,10 @@ mod tests {
         fs::remove_file(&path).unwrap();
         assert_eq!(loaded.areas["office"], "area123");
         assert_eq!(loaded.entries["mqtt"].entry_id, "entry456");
+        assert_eq!(
+            loaded.entries["mqtt"].options,
+            vec![json!({ "discovery": true })]
+        );
         assert_eq!(
             loaded.entries["mqtt"].steps,
             vec![json!({ "broker": "127.0.0.1" })]

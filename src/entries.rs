@@ -41,16 +41,7 @@ pub fn reconcile(
         if let Some(title) = &entry.title {
             set_title(api, ws, &entry_id, title)?;
         }
-        if !entry.options.is_empty() {
-            log::info!("applying options of entry {name}");
-            flow::drive(
-                api,
-                OPTIONS_FLOW,
-                json!({ "handler": entry_id }),
-                &entry.options,
-                &format!("options of entry {name}"),
-            )?;
-        }
+        apply_options(api, name, entry, &entry_id, state, state_path)?;
     }
     if declaration.remove_onboarding_integrations {
         remove_onboarding_leftovers(api, state)?;
@@ -135,8 +126,37 @@ fn remember(
         EntryState {
             entry_id,
             steps: entry.steps.clone(),
+            options: Vec::new(),
         },
     );
+    state.save(state_path)
+}
+
+fn apply_options(
+    api: &Api,
+    name: &str,
+    entry: &Entry,
+    entry_id: &str,
+    state: &mut State,
+    state_path: &Path,
+) -> Result<()> {
+    let Some(known) = state.entries.get_mut(name) else {
+        return Ok(());
+    };
+    if known.options == entry.options {
+        return Ok(());
+    }
+    if !entry.options.is_empty() {
+        log::info!("applying options of entry {name}");
+        flow::drive(
+            api,
+            OPTIONS_FLOW,
+            json!({ "handler": entry_id }),
+            &entry.options,
+            &format!("options of entry {name}"),
+        )?;
+    }
+    known.options = entry.options.clone();
     state.save(state_path)
 }
 
