@@ -87,7 +87,7 @@ impl Api {
     pub fn wait_until_ready(&self, timeout: Duration) -> Result<()> {
         let started = Instant::now();
         loop {
-            match self.get("/api/onboarding") {
+            match self.get("/manifest.json") {
                 Ok(response) if response.status == 200 => return Ok(()),
                 Ok(response) => log::info!("waiting for Home Assistant (HTTP {})", response.status),
                 Err(error) => log::info!("waiting for Home Assistant ({error})"),

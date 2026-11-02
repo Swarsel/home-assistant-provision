@@ -1,18 +1,23 @@
 use anyhow::{Context, Result};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::{api::Api, declaration::Owner, flow};
 
 pub fn authenticate(api: &mut Api, owner: &Owner, password: &str) -> Result<bool> {
-    let steps = api
-        .get("/api/onboarding")?
-        .expect_success("onboarding status")?;
+    let response = api.get("/api/onboarding")?;
+    let onboarded = response.status == 404;
+    let steps = if onboarded {
+        Value::Null
+    } else {
+        response.expect_success("onboarding status")?
+    };
     let done = |name: &str| {
-        steps
-            .as_array()
-            .into_iter()
-            .flatten()
-            .any(|step| step["step"] == name && step["done"] == true)
+        onboarded
+            || steps
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|step| step["step"] == name && step["done"] == true)
     };
     let client_id = format!("{}/", api.base());
     let created_owner = !done("user");

@@ -72,7 +72,16 @@
           };
           pre-commit.settings = {
             hooks = {
-              clippy.enable = true;
+              clippy = {
+                enable = true;
+                packageOverrides.cargo = pkgs.symlinkJoin {
+                  name = "cargo-with-cc";
+                  paths = [
+                    pkgs.cargo
+                    pkgs.stdenv.cc
+                  ];
+                };
+              };
               deadnix.enable = true;
               statix.enable = true;
               treefmt.enable = true;
